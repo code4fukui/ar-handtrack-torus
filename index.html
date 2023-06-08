@@ -6,7 +6,9 @@
 <body style="margin:0; background-color: #111">
 
 <div id="info" style="position:absolute; top: 1em; background-color: rgba(255, 255, 255, 0.5); padding: 0.3em; margin: 0.3em;">
-<a href="https://github.com/code4fukui/ar-handtrack-torus/">AR handtrack torus</a> forked from <a href=https://code4fukui.github.io/ar-handbutton/>AR handbutton</a> with <a href=https://threejs.org/>three.js</a>
+<a href="https://github.com/code4fukui/ar-handtrack-torus/">AR handtrack torus</a> forked from <a href=https://code4fukui.github.io/ar-handbutton/>AR handbutton</a> with <a href=https://threejs.org/>three.js</a><br>
+<a href="./cake.html">AR cake</a><br>
+<a href="./watch.html">AR watch</a><br>
 <style>
 	#info {
 		color: #f8f8f8;
@@ -40,12 +42,18 @@ import { createText } from 'three/addons/webxr/Text2D.js';
 
 import { World, System, Component, TagComponent, Types } from 'three/addons/libs/ecsy.module.js';
 
+let hands = null;
+let target = null;
+let colors = null;
+let drotation = null;
+
 // base class https://code4fukui.github.io/three.js/examples/jsm/webxr/OculusHandModel.js
 class MyHandModel extends OculusHandModel {
 	constructor(controller) {
 		super(controller);
 		this.tapping = false;
 		this.tapped = false;
+		this.untapped = false;
 		this.tappoint = null;
 	}
 	updateMatrixWorld(force) {
@@ -55,10 +63,11 @@ class MyHandModel extends OculusHandModel {
 		const indexFingerTip = this.controller.joints["index-finger-tip"];
 		const thumbFingerTip = this.controller.joints["thumb-tip"];
 		if (!indexFingerTip || !thumbFingerTip) {
-			this.tapping = false;
+			//this.tapping = false;
 			return;
 		}
 		const d = indexFingerTip.position.distanceTo(thumbFingerTip.position);
+		
 		if (!this.tapping) {
 			if (d < 0.010) {
 				this.tapped = true;
@@ -68,9 +77,17 @@ class MyHandModel extends OculusHandModel {
 		} else {
 			if (d > 0.015) {
 				this.tapping = false;
-				this.tappoint = null;
+				this.untapped = true;
 			}
 		}
+		/*
+		const t = d < 0.015;
+		if (!this.tapping && t) {
+			this.tapped = true;
+			this.tappoint = indexFingerTip.position.clone();
+		}
+		this.tapping = t;
+		*/
 	}
 	isTapped() {
 		if (this.tapped) {
@@ -79,18 +96,22 @@ class MyHandModel extends OculusHandModel {
 		}
 		return false;
 	}
+	isUnTapped() {
+		if (this.untapped) {
+			this.untapped = false;
+			return true;
+		}
+		return false;
+	}
 	isTapping() {
 		return this.tapping;
 	}
 	getTapVector() {
-		if (!this.tapping || !this.tappoint) {
-			return null;
-		}
 		const indexFingerTip = this.controller.joints["index-finger-tip"];
 		if (!indexFingerTip) {
 			return null;
 		}
-		return indexFingerTip.position.sub(this.tappoint);
+		return indexFingerTip.position.clone().sub(this.tappoint);
 	}
 }
 
@@ -221,35 +242,40 @@ class FingerInputSystem extends System {
 	}
 
 	execute( delta/*, time*/ ) {
-
-		this.queries.pressable.results.forEach( entity => {
-
-			const button = entity.getMutableComponent(Button);
-			const object = entity.getComponent(Object3D).object;
-			const pressingDistances = [];
-			this.hands.forEach(hand => {
-				if (hand) {
+		const hand = this.hands[0];
+		if (hand) {
 					/*
 					if (hand.intersectBoxObject(object)) {
 						const pressingPosition = hand.getPointerPosition();
 						pressingDistances.push( button.surfaceY - object.worldToLocal( pressingPosition ).y );
 					}
 					*/
-
-					const d = hand.getTapVector();
-					if (d) {
-						this.drotation.x = d.x;
-						this.drotation.y = d.y;
-						this.drotation.z = d.z;
-					}
+					
 					/*
 					if (hand.isTapped()) {
 						this.nmode++;
 						this.target.material.color.setHex(this.colors[this.nmode % this.colors.length]);
 					}
 					*/
+					
+					if (hand.isTapping()) {
+						this.target.material.color.setHex(this.colors[1]);
+					} else {
+						this.target.material.color.setHex(this.colors[0]);
+					}
+					
 				}
-			});
+				/*
+
+		this.queries.pressable.results.forEach( entity => {
+
+			const button = entity.getMutableComponent(Button);
+			const object = entity.getComponent(Object3D).object;
+			const pressingDistances = [];
+			const hand = this.hands[0];
+
+			//this.hands.forEach(hand => {
+			//});
 
 			if ( pressingDistances.length == 0 ) { // not pressed this frame
 
@@ -282,10 +308,8 @@ class FingerInputSystem extends System {
 
 				}
 
-			}
-
 		} );
-
+*/
 	}
 
 }
@@ -313,9 +337,9 @@ class RotatingSystem extends System {
 			object.rotation.y += this.drotation.y * delta;
 			object.rotation.z += this.drotation.z * delta;
 			*/
-			const r = 1.5;
-			object.rotation.x = this.drotation.y * r;
-			object.rotation.y = -this.drotation.x * r;
+			const r = 2;
+			object.rotation.x = -this.drotation.y * r;
+			object.rotation.y = this.drotation.x * r;
 			object.rotation.z = this.drotation.z * r;
 		} );
 
@@ -487,11 +511,10 @@ function init() {
 	controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
 	scene.add( controllerGrip1 );
 
-	const hand1 = renderer.xr.getHand( 0 );
+	const hand1 = renderer.xr.getHand(0);
 	//const handModel1 = new OculusHandModel(hand1);
 	const handModel1 = new MyHandModel(hand1);
 	//const handModel1 = handModelFactory.createHandModel(hand1);
-	console.log(handModel1);
 	hand1.add( handModel1 );
 	scene.add( hand1 );
 
@@ -500,7 +523,7 @@ function init() {
 	controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
 	scene.add( controllerGrip2 );
 
-	const hand2 = renderer.xr.getHand( 1 );
+	const hand2 = renderer.xr.getHand(1);
 	//const handModel2 = new OculusHandModel( hand2 );
 	const handModel2 = new MyHandModel(hand2);
 	//const handModel2 = handModelFactory.createHandModel(hand2);
@@ -532,7 +555,7 @@ function init() {
 	scene.add(consoleMesh);
 
 	//const colors = [0x33ff33, 0xaaaa33, 0xff3333];
-	const colors = [0xff2020, 0xffff20, 0x20ffff, 0x2020ff, 0x20ff20];
+	/*const */colors = [0xff2020, 0xffff20, 0x20ffff, 0x2020ff, 0x20ff20];
 
 	const orangeButton = makeButtonMesh( 0.08, 0.1, 0.08, colors[0]);
 	orangeButton.position.set( - 0.15, 0.04, 0 );
@@ -587,8 +610,11 @@ function init() {
 	//consoleMesh.add(exitText);
 
 	// drotation
-	const drotation = new THREE.Vector3();
-
+	/*const */drotation = new THREE.Vector3();
+	hands = [handModel1, handModel2];
+	//colors = this.colors;
+	target = torusKnot;
+	
 	world
 		.registerComponent( Object3D )
 		.registerComponent( Button )
@@ -603,7 +629,7 @@ function init() {
 		//.registerSystem( InstructionSystem, { controllers: [ controllerGrip1, controllerGrip2 ] } )
 		.registerSystem( CalibrationSystem, { renderer: renderer, camera: camera } )
 		.registerSystem( ButtonSystem, { renderer: renderer, camera: camera } )
-		.registerSystem( FingerInputSystem, { hands: [handModel1, handModel2], target: torusKnot, colors, drotation } );
+		//.registerSystem( FingerInputSystem, { hands: [handModel1, handModel2], target: torusKnot, colors, drotation } );
 
 	const csEntity = world.createEntity();
 	csEntity.addComponent( OffsetFromCamera, { x: 0, y: - 0.4, z: - 0.3 } );
@@ -647,14 +673,10 @@ function init() {
 	ebEntity.addComponent( Pressable );
 	ebEntity.addComponent( Object3D, { object: exitButton } );
 	const ebAction = function () {
-
 		exitText.visible = true;
 		setTimeout( function () {
-
 			exitText.visible = false; renderer.xr.getSession().end();
-
 		}, 2000 );
-
 	};
 
 	ebEntity.addComponent( Button, { action: ebAction, surfaceY: 0.05, recoverySpeed: 0.2, fullPressDistance: 0.02 } );
@@ -678,15 +700,53 @@ function onWindowResize() {
 }
 
 function animate() {
-	renderer.setAnimationLoop( render );
+	renderer.setAnimationLoop(render);
 }
+
+let lasttappoint = new THREE.Vector3(0, 0, 0);
 
 function render() {
 	const delta = clock.getDelta();
 	const elapsedTime = clock.elapsedTime;
-	renderer.xr.updateCamera( camera );
-	world.execute( delta, elapsedTime );
-	renderer.render( scene, camera );
+	renderer.xr.updateCamera(camera);
+	world.execute(delta, elapsedTime);
+
+	const hand = hands[0];
+	if (hand) {
+		/*
+		if (hand.isTapped()) {
+			this.nmode++;
+			this.target.material.color.setHex(this.colors[this.nmode % this.colors.length]);
+		}
+		*/
+		
+		if (hand.isTapping()) {
+			const d = hand.getTapVector();
+			if (d) {
+				drotation.x = d.x + lasttappoint.x;
+				drotation.y = d.y + lasttappoint.y;
+				drotation.z = d.z + lasttappoint.z;
+			}
+
+			target.material.color.setHex(colors[1]);
+		} else {
+			target.material.color.setHex(colors[0]);
+		}
+		if (hand.isUnTapped()) {
+			const p = hand.getTapVector();
+			lasttappoint.x += p.x;
+			lasttappoint.y += p.y;
+			lasttappoint.z += p.z;
+			/*
+			const r = 2;
+			target.rotation.x += -p.y * r;
+			target.rotation.y += p.x * r;
+			target.rotation.z += p.z * r;
+			*/
+		}
+	}
+
+	renderer.render(scene, camera);
 }
 
 </script>
