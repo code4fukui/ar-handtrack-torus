@@ -1,14 +1,15 @@
 <!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="icon" href="data:">
-<title>AR handtrack torus</title>
+<title>AR handtrack</title>
 </head>
 <body>
 
 <body style="margin:0; background-color: #111">
 
 <div id="info" style="position:absolute; top: 1em; background-color: rgba(255, 255, 255, 0.5); padding: 0.3em; margin: 0.3em;">
-<a href="https://github.com/code4fukui/ar-handtrack-torus/">AR handtrack torus</a> forked from <a href=https://code4fukui.github.io/ar-handbutton/>AR handbutton</a> with <a href=https://threejs.org/>three.js</a><br>
-<a href="./cake.html">AR cake</a><br>
-<a href="./watch.html">AR watch</a><br>
+<a href="https://github.com/code4fukui/ar-handtrack-torus/">AR handtrack</a> forked from <a href=https://code4fukui.github.io/ar-handbutton/>AR handbutton</a> with <a href=https://threejs.org/>three.js</a><br>
+<a href="?cake#cake.glb">AR cake</a> at <a href=https://sabae.cc/>SCC</a><br>
+<a href="?watch#watch.glb">AR watch</a> at <a href=https://sabae.cc/>SCC</a><br>
+<a href="?hotsand#hotsand.glb">AR hotsand</a> at <a href=https://latempo-sabae.com/>La Tempo</a><br>
 <style>
 	#info {
 		color: #f8f8f8;
@@ -39,8 +40,20 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { OculusHandModel } from 'three/addons/webxr/OculusHandModel.js';
 import { createText } from 'three/addons/webxr/Text2D.js';
-
 import { World, System, Component, TagComponent, Types } from 'three/addons/libs/ecsy.module.js';
+
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const glbfn = location.hash.substring(1);
+
+// support Promise
+export class PromiseGLTFLoader extends GLTFLoader {
+  promiseLoad(url, onProgress) {
+    return new Promise((resolve, reject) => {
+      super.load(url, resolve, onProgress, reject);
+    });
+  }
+};
 
 let hands = null;
 let target = null;
@@ -337,10 +350,11 @@ class RotatingSystem extends System {
 			object.rotation.y += this.drotation.y * delta;
 			object.rotation.z += this.drotation.z * delta;
 			*/
-			const r = 2;
-			object.rotation.x = -this.drotation.y * r;
+			const r = 3;
+			//object.rotation.x = -this.drotation.y * r;
+			object.position.y = this.drotation.y;
 			object.rotation.y = this.drotation.x * r;
-			object.rotation.z = this.drotation.z * r;
+			//object.rotation.z = this.drotation.z * r;
 		} );
 
 	}
@@ -444,7 +458,7 @@ const world = new World();
 const clock = new THREE.Clock();
 let camera, scene, renderer;
 
-init();
+await init();
 animate();
 
 function makeButtonMesh( x, y, z, color ) {
@@ -458,7 +472,7 @@ function makeButtonMesh( x, y, z, color ) {
 
 }
 
-function init() {
+async function init() {
 
 	const container = document.createElement( 'div' );
 	document.body.appendChild( container );
@@ -549,7 +563,7 @@ function init() {
 	//const consoleMaterial = new THREE.MeshPhongMaterial({ color: 0x595959 });
 	const consoleMaterial = new THREE.MeshPhongMaterial({ color: 0x101010 });
 	const consoleMesh = new THREE.Mesh(consoleGeometry, consoleMaterial);
-	consoleMesh.position.set(0, 1, - 0.3);
+	consoleMesh.position.set(0, 1.12, -0.3);
 	consoleMesh.castShadow = true;
 	consoleMesh.receiveShadow = true;
 	scene.add(consoleMesh);
@@ -584,16 +598,31 @@ function init() {
 	//consoleMesh.add( exitButton );
 
 	// main object
-	const tkGeometry = new THREE.TorusKnotGeometry(0.15, 0.008, 400, 32, 7);
-	//const tkMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
-	const tkMaterial = new THREE.MeshPhongMaterial({ color: 0xff2020 });
-	tkMaterial.metalness = 0.8;
-	const torusKnot = new THREE.Mesh(tkGeometry, tkMaterial);
-	//torusKnot.position.set(0, .4, -0.15);
-	torusKnot.position.set(0, .22, 0);
-	consoleMesh.add(torusKnot);
-	//torusKnot.position.set(0, 1.2, -0.4);
-	//scene.add(torusKnot);
+	if (!glbfn) {
+		const tkGeometry = new THREE.TorusKnotGeometry(0.15, 0.008, 400, 32, 7);
+		//const tkMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
+		const tkMaterial = new THREE.MeshPhongMaterial({ color: 0xff2020 });
+		tkMaterial.metalness = 0.8;
+		const torusKnot = new THREE.Mesh(tkGeometry, tkMaterial);
+		//torusKnot.position.set(0, .4, -0.15);
+		torusKnot.position.set(0, .22, 0);
+		consoleMesh.add(torusKnot);
+		target = torusKnot;
+		//torusKnot.position.set(0, 1.2, -0.4);
+		//scene.add(torusKnot);
+	} else {
+		const loader = new PromiseGLTFLoader();
+		loader.crossOrigin = "anonymous";
+		const gltf = await loader.promiseLoad(
+			glbfn,
+			//(progress) => console.log("Loading model...", 100.0 * (progress.loaded / progress.total), "%")
+		);
+		consoleMesh.add(gltf.scene);
+		console.log(gltf.scene);
+		//torusKnot.position.set(0, .12, 0);
+		target = gltf.scene;
+	}
+
 
 	const instructionText = createText('This is a WebXR Hands demo, please explore with hands.', 0.04 );
 	//instructionText.position.set( 0, 1.6, - 0.6 );
@@ -613,7 +642,6 @@ function init() {
 	/*const */drotation = new THREE.Vector3();
 	hands = [handModel1, handModel2];
 	//colors = this.colors;
-	target = torusKnot;
 	
 	world
 		.registerComponent( Object3D )
@@ -683,7 +711,7 @@ function init() {
 
 	const tkEntity = world.createEntity();
 	tkEntity.addComponent( Rotating );
-	tkEntity.addComponent( Object3D, { object: torusKnot } );
+	tkEntity.addComponent( Object3D, { object: target } );
 
 	const itEntity = world.createEntity();
 	itEntity.addComponent( HandsInstructionText );
@@ -728,9 +756,9 @@ function render() {
 				drotation.z = d.z + lasttappoint.z;
 			}
 
-			target.material.color.setHex(colors[1]);
+			//target.material.color.setHex(colors[1]);
 		} else {
-			target.material.color.setHex(colors[0]);
+			//target.material.color.setHex(colors[0]);
 		}
 		if (hand.isUnTapped()) {
 			const p = hand.getTapVector();
