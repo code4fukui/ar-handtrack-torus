@@ -7,9 +7,10 @@
 
 <div id="info" style="position:absolute; top: 1em; background-color: rgba(255, 255, 255, 0.5); padding: 0.3em; margin: 0.3em;">
 <a href="https://github.com/code4fukui/ar-handtrack-torus/">AR handtrack</a> forked from <a href=https://code4fukui.github.io/ar-handbutton/>AR handbutton</a> with <a href=https://threejs.org/>three.js</a><br>
-<a href="?cake#cake.glb">AR cake</a> at <a href=https://sabae.cc/>SCC</a><br>
-<a href="?watch#watch.glb">AR watch</a> at <a href=https://sabae.cc/>SCC</a><br>
 <a href="?hotsand#hotsand.glb">AR hotsand</a> at <a href=https://latempo-sabae.com/>La Tempo</a><br>
+<a href="?cake#cake.glb">AR cake</a> at <a href=https://slim.velvet.jp/index.html/>SLIM The Coffee Resort</a><br>
+<a href="?kaisendon#kaisendon.glb">AR kaisendon</a> at <a href=https://syupo.com/archives/68167>Kitatei</a><br>
+
 <style>
 	#info {
 		color: #f8f8f8;
@@ -125,6 +126,13 @@ class MyHandModel extends OculusHandModel {
 			return null;
 		}
 		return indexFingerTip.position.clone().sub(this.tappoint);
+	}
+	getTapPoint() {
+		const indexFingerTip = this.controller.joints["index-finger-tip"];
+		if (!indexFingerTip) {
+			return null;
+		}
+		return indexFingerTip.position.clone();
 	}
 }
 
@@ -255,7 +263,7 @@ class FingerInputSystem extends System {
 	}
 
 	execute( delta/*, time*/ ) {
-		const hand = this.hands[0];
+		const hand = getRightHand(this.hands);
 		if (hand) {
 					/*
 					if (hand.intersectBoxObject(object)) {
@@ -352,8 +360,8 @@ class RotatingSystem extends System {
 			*/
 			const r = 3;
 			//object.rotation.x = -this.drotation.y * r;
-			object.position.y = this.drotation.y;
-			object.rotation.y = this.drotation.x * r;
+			object.position.y += this.drotation.y;
+			object.rotation.y += this.drotation.x;// * r;
 			//object.rotation.z = this.drotation.z * r;
 		} );
 
@@ -731,7 +739,27 @@ function animate() {
 	renderer.setAnimationLoop(render);
 }
 
-let lasttappoint = new THREE.Vector3(0, 0, 0);
+const getRightHand = (hands) => {
+	if (hands.length == 0) {
+		return null;
+	}
+	if (hands.length == 1) {
+		return hands[0];
+	}
+	const p0 = hands[0].getPointerPosition();
+	const p1 = hands[1].getPointerPosition();
+	if (!p0) {
+		return hands[1];
+	} else if (!p1) {
+		return hands[0];
+	}
+	const cp = camera.position;
+	const th0 = Math.atan2(cp.z - p0.z, cp.x - p0.x);
+	const th1 = Math.atan2(cp.z - p1.z, cp.x - p1.x);
+	return th0 > th1 ? hands[0] : hands[1];
+};
+
+let lasttappoint = null;
 
 function render() {
 	const delta = clock.getDelta();
@@ -739,7 +767,7 @@ function render() {
 	renderer.xr.updateCamera(camera);
 	world.execute(delta, elapsedTime);
 
-	const hand = hands[0];
+	const hand = hands[0]; // getRightHand(hands);
 	if (hand) {
 		/*
 		if (hand.isTapped()) {
@@ -749,29 +777,39 @@ function render() {
 		*/
 		
 		if (hand.isTapping()) {
-			const d = hand.getTapVector();
+			const d = hand.getTapPoint();
 			if (d) {
-				drotation.x = d.x + lasttappoint.x;
-				drotation.y = d.y + lasttappoint.y;
-				drotation.z = d.z + lasttappoint.z;
+				if (lasttappoint) {
+					const p = target.position;
+					const th0 = Math.atan2(p.z - lasttappoint.z, p.x - lasttappoint.x);
+					const th1 = Math.atan2(p.z - d.z, p.x - d.x);
+					drotation.x = th0 - th1;
+					drotation.y = d.y - lasttappoint.y;
+					drotation.z = 0; // d.z + lasttappoint.z;
+				}
+				lasttappoint = d;
 			}
 
-			//target.material.color.setHex(colors[1]);
+			if (target.material) {
+				target.material.color.setHex(colors[1]);
+			}
 		} else {
-			//target.material.color.setHex(colors[0]);
+			if (target.material) {
+				target.material.color.setHex(colors[0]);
+			}
+			lasttappoint = null;
+			drotation.x = 0;
+			drotation.y = 0;
+			drotation.z = 0;
 		}
+		/*
 		if (hand.isUnTapped()) {
 			const p = hand.getTapVector();
 			lasttappoint.x += p.x;
 			lasttappoint.y += p.y;
 			lasttappoint.z += p.z;
-			/*
-			const r = 2;
-			target.rotation.x += -p.y * r;
-			target.rotation.y += p.x * r;
-			target.rotation.z += p.z * r;
-			*/
 		}
+		*/
 	}
 
 	renderer.render(scene, camera);
