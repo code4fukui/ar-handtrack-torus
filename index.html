@@ -780,7 +780,7 @@ function render() {
 			const d = hand.getTapPoint();
 			if (d) {
 				if (lasttappoint) {
-					const p = target.position;
+					const p = target.position.clone().add(target.parent.position);
 					const th0 = Math.atan2(p.z - lasttappoint.z, p.x - lasttappoint.x);
 					const th1 = Math.atan2(p.z - d.z, p.x - d.x);
 					drotation.x = th0 - th1;
