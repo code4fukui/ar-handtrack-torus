@@ -1,5 +1,7 @@
 # ar-handtrack-torus
 
+> 日本語のREADMEはこちらです: [README.ja.md](README.ja.md)
+
 AR handtrack forked from AR handbutton with three.js
 
 ## Demo
