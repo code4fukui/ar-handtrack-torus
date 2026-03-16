@@ -17,4 +17,4 @@ https://code4fukui.github.io/ar-handtrack-torus/
 Access the website and allow camera access to experience the AR features.
 
 ## License
-MIT License
+MIT License — see [LICENSE](LICENSE).
